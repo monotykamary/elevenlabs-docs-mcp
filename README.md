@@ -19,16 +19,21 @@ The server provides the following tools:
    - Parameters:
      - `path` (required): Document path relative to the fern directory
 
-3. **elevenlabs_list_categories**: List ElevenLabs documentation categories.
+3. **elevenlabs_get_docs_structure**: Retrieve and parse the docs.yml file to understand the documentation structure.
    - Parameters:
-     - `limit` (optional): Maximum number of categories to return (default: 20)
+     - `includeApiDetails` (optional): Whether to include detailed API information or just the structure (default: false)
 
-4. **elevenlabs_list_api_endpoints**: List available ElevenLabs API endpoints.
+4. **elevenlabs_list_repository_path**: List files and directories at a specific path in the repository.
+   - Parameters:
+     - `path` (required): Path to list (relative to repository root)
+     - `depth` (optional): How many levels deep to traverse (default: 1)
+
+5. **elevenlabs_list_api_endpoints**: List available ElevenLabs API endpoints.
    - Parameters:
      - `category` (optional): API category to filter endpoints
      - `limit` (optional): Maximum number of endpoints to return (default: 20)
 
-5. **elevenlabs_get_api_reference**: Get API reference for a specific ElevenLabs API endpoint.
+6. **elevenlabs_get_api_reference**: Get API reference for a specific ElevenLabs API endpoint.
    - Parameters:
      - `endpoint` (required): API endpoint path (e.g., '/v1/text-to-speech')
 
@@ -121,10 +126,16 @@ mcp_elevenlabs_search_docs(query="text to speech tutorial", limit=5)
 mcp_elevenlabs_get_api_reference(endpoint="/v1/text-to-speech")
 ```
 
-### Example 3: Listing Documentation Categories
+### Example 3: Getting Documentation Structure
 
 ```
-mcp_elevenlabs_list_categories()
+mcp_elevenlabs_get_docs_structure(includeApiDetails=false)
+```
+
+### Example 4: Exploring Repository Files
+
+```
+mcp_elevenlabs_list_repository_path(path="fern/apis", depth=2)
 ```
 
 ## Troubleshooting

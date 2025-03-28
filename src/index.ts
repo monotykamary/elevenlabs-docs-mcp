@@ -8,7 +8,6 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as yaml from 'js-yaml';
-import SwaggerParser from '@apidevtools/swagger-parser';
 
 // Type definitions for tool arguments
 interface SearchDocsArgs {
@@ -20,10 +19,6 @@ interface GetDocArgs {
   path: string;
 }
 
-interface ListCategoriesArgs {
-  limit?: number;
-}
-
 interface ListApiEndpointsArgs {
   category?: string;
   limit?: number;
@@ -31,6 +26,15 @@ interface ListApiEndpointsArgs {
 
 interface GetApiReferenceArgs {
   endpoint: string;
+}
+
+interface GetDocsStructureArgs {
+  includeApiDetails?: boolean;
+}
+
+interface ListRepositoryPathArgs {
+  path: string;
+  depth?: number;
 }
 
 // Tool definitions
@@ -69,18 +73,38 @@ const getDocTool: Tool = {
   },
 };
 
-const listCategoriesTool: Tool = {
-  name: "elevenlabs_list_categories",
-  description: "List ElevenLabs documentation categories",
+const getDocsStructureTool: Tool = {
+  name: "elevenlabs_get_docs_structure",
+  description: "Retrieve and parse the docs.yml file to understand the documentation structure",
   inputSchema: {
     type: "object",
     properties: {
-      limit: {
-        type: "number",
-        description: "Maximum number of categories to return (default 20)",
-        default: 20,
+      includeApiDetails: {
+        type: "boolean",
+        description: "Whether to include detailed API information or just the structure",
+        default: false,
       },
     },
+  },
+};
+
+const listRepositoryPathTool: Tool = {
+  name: "elevenlabs_list_repository_path",
+  description: "List files and directories at a specific path in the repository",
+  inputSchema: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Path to list (relative to repository root)",
+      },
+      depth: {
+        type: "number",
+        description: "How many levels deep to traverse (default: 1)",
+        default: 1,
+      },
+    },
+    required: ["path"],
   },
 };
 
@@ -165,7 +189,7 @@ class ElevenLabsClient {
     return response.json();
   }
 
-  async listContents(path: string = "fern"): Promise<any> {
+  async listContents(path: string = "fern", recursive: boolean = false, depth: number = 1): Promise<any> {
     const apiUrl = `${this.baseUrl}/repos/${this.owner}/${this.repo}/contents/${path}`;
     const response = await fetch(apiUrl, { headers: this.githubHeaders });
     
@@ -173,7 +197,107 @@ class ElevenLabsClient {
       throw new Error(`Failed to list contents: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const items = await response.json();
+    
+    // If we're not recursing or at max depth, just return the items
+    if (!recursive || depth <= 0) {
+      return items;
+    }
+    
+    // Otherwise, we need to get the contents of each directory
+    const result = [];
+    for (const item of items) {
+      result.push(item);
+      if (item.type === "dir") {
+        try {
+          const subItems = await this.listContents(item.path, recursive, depth - 1);
+          result.push(...subItems);
+        } catch (error) {
+          console.error(`Error listing contents of ${item.path}:`, error);
+        }
+      }
+    }
+    
+    return result;
+  }
+  
+  // Process docs.yml to extract the documentation structure
+  async getDocsStructure(includeApiDetails: boolean = false): Promise<any> {
+    const docsYmlPath = "fern/docs.yml";
+    try {
+      const content = await this.getFileContent(docsYmlPath);
+      const parsedYaml = yaml.load(content) as any;
+      
+      if (!parsedYaml) {
+        throw new Error(`Failed to parse ${docsYmlPath}`);
+      }
+      
+      // Create a more accessible structure from the docs.yml
+      const structure = {
+        title: parsedYaml.title,
+        subtitle: parsedYaml.subtitle,
+        sections: [] as any[],
+      };
+      
+      // Process sections
+      if (parsedYaml.sections) {
+        for (const section of parsedYaml.sections) {
+          const processedSection = {
+            title: section.title,
+            pages: [] as any[],
+          };
+          
+          // Process pages in each section
+          if (section.pages) {
+            for (const page of section.pages) {
+              // If it's a reference to an API, fetch details if requested
+              if (includeApiDetails && typeof page === 'object' && page.api) {
+                try {
+                  const apiPath = `fern/apis/${page.api}/definition`;
+                  const apiContent = await this.getFileContent(apiPath);
+                  const apiYaml = yaml.load(apiContent) as any;
+                  
+                  processedSection.pages.push({
+                    type: 'api',
+                    api: page.api,
+                    apiDetails: apiYaml,
+                  });
+                } catch (error) {
+                  // If we can't fetch the API details, just include the reference
+                  processedSection.pages.push({
+                    type: 'api',
+                    api: page.api,
+                    error: String(error),
+                  });
+                }
+              } 
+              // Regular page reference
+              else if (typeof page === 'string') {
+                processedSection.pages.push({
+                  type: 'page',
+                  path: page,
+                });
+              }
+              // Object with title and path
+              else if (typeof page === 'object') {
+                processedSection.pages.push({
+                  type: 'page',
+                  title: page.title,
+                  path: page.path,
+                });
+              }
+            }
+          }
+          
+          structure.sections.push(processedSection);
+        }
+      }
+      
+      return structure;
+    } catch (error) {
+      console.error("Error getting docs structure:", error);
+      throw error;
+    }
   }
 
   // Process YAML content to extract meaningful information
@@ -283,25 +407,49 @@ async function main() {
               content: [{ type: "text", text: JSON.stringify(processedContent) }],
             };
           }
-
-          case "elevenlabs_list_categories": {
-            const args = request.params.arguments as unknown as ListCategoriesArgs;
-            const limit = args.limit || 20;
+          
+          case "elevenlabs_get_docs_structure": {
+            const args = request.params.arguments as unknown as GetDocsStructureArgs;
+            const includeApiDetails = args.includeApiDetails || false;
             
-            const contents = await elevenLabsClient.listContents("fern");
-            
-            // Filter to only include directories which represent categories
-            const categories = contents
-              .filter((item: any) => item.type === "dir")
-              .slice(0, limit)
-              .map((item: any) => ({
-                name: item.name,
-                path: item.path,
-                url: item.html_url
-              }));
+            const structure = await elevenLabsClient.getDocsStructure(includeApiDetails);
             
             return {
-              content: [{ type: "text", text: JSON.stringify({ categories }) }],
+              content: [{ type: "text", text: JSON.stringify({ structure }) }],
+            };
+          }
+          
+          case "elevenlabs_list_repository_path": {
+            const args = request.params.arguments as unknown as ListRepositoryPathArgs;
+            if (!args.path) {
+              throw new Error("Missing required argument: path");
+            }
+            
+            const depth = args.depth || 1;
+            const recursive = depth > 1;
+            
+            // If path doesn't start with fern, we'll assume it's a repository-relative path
+            const path = args.path === "" ? "fern" : args.path;
+            
+            const contents = await elevenLabsClient.listContents(path, recursive, depth);
+            
+            // Process contents into a more useful format
+            const processedContents = Array.isArray(contents) 
+              ? contents.map((item: any) => ({
+                name: item.name,
+                type: item.type,
+                path: item.path,
+                url: item.html_url,
+              }))
+              : [{ 
+                name: contents.name,
+                type: contents.type,
+                path: contents.path,
+                url: contents.html_url,
+              }];
+            
+            return {
+              content: [{ type: "text", text: JSON.stringify({ contents: processedContents }) }],
             };
           }
 
@@ -358,7 +506,44 @@ async function main() {
               throw new Error("Missing required argument: endpoint");
             }
             
-            // Search for API reference docs that match the endpoint
+            // First try to get structure from docs.yml to find the right API reference
+            try {
+              const structure = await elevenLabsClient.getDocsStructure(true);
+              
+              // Look for a matching API in the structure
+              let apiPath = null;
+              let apiDetails = null;
+              
+              for (const section of structure.sections) {
+                for (const page of section.pages) {
+                  if (page.type === 'api' && page.apiDetails &&
+                      page.apiDetails.paths && page.apiDetails.paths[args.endpoint]) {
+                    apiPath = `fern/apis/${page.api}`;
+                    apiDetails = page.apiDetails.paths[args.endpoint];
+                    break;
+                  }
+                }
+                if (apiPath) break;
+              }
+              
+              if (apiPath && apiDetails) {
+                return {
+                  content: [{ 
+                    type: "text", 
+                    text: JSON.stringify({
+                      endpoint: args.endpoint,
+                      apiPath,
+                      reference: apiDetails
+                    }) 
+                  }],
+                };
+              }
+            } catch (error) {
+              console.error("Error finding API reference in docs structure:", error);
+              // Fall back to search method if structure parsing fails
+            }
+            
+            // Fall back to search-based method
             const query = `${args.endpoint} path:fern/apis`;
             const searchResults = await elevenLabsClient.searchCode(query, 5);
             
@@ -416,7 +601,8 @@ async function main() {
       tools: [
         searchDocsTool,
         getDocTool,
-        listCategoriesTool,
+        getDocsStructureTool,
+        listRepositoryPathTool,
         listApiEndpointsTool,
         getApiReferenceTool,
       ],
