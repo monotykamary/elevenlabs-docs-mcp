@@ -1,6 +1,6 @@
 # ElevenLabs Documentation MCP Server
 
-A Model Context Protocol (MCP) server for interacting with ElevenLabs documentation. This is really a glorified GitHub MCP server pointint to their `fern` docs on GitHub.
+A Model Context Protocol (MCP) server for interacting with ElevenLabs documentation. This is really a glorified GitHub MCP server point it to their `fern` docs on GitHub.
 
 ## Overview
 
@@ -74,6 +74,38 @@ The server uses the following environment variables:
    ```bash
    docker run -e GITHUB_TOKEN=your_github_token mcp-server-elevenlabs
    ```
+
+## Usage with Claude Desktop
+
+To use this MCP server with Claude Desktop, add the following configuration to your Claude Desktop settings:
+
+```json
+{
+  "mcpServers": {
+    "elevenlabs": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_TOKEN",
+        "ghcr.io/monotykamary/elevenlabs-docs:latest"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token_here"
+      }
+    }
+  }
+}
+```
+
+With this configuration:
+1. Claude will automatically start the Docker container when needed
+2. The MCP server will have access to your GitHub token (optional, for higher rate limits)
+3. The container will be removed when Claude Desktop is closed
+
+To avoid rate limiting issues with GitHub, it's recommended to provide a GitHub personal access token with at least `public_repo` scope.
 
 ## Usage Examples
 
