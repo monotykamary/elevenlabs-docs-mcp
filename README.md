@@ -1,6 +1,6 @@
 # ElevenLabs Documentation MCP Server
 
-A Model Context Protocol (MCP) server for interacting with ElevenLabs documentation.
+A Model Context Protocol (MCP) server for interacting with ElevenLabs documentation. This is really a glorified GitHub MCP server pointint to their `fern` docs on GitHub.
 
 ## Overview
 
@@ -54,7 +54,7 @@ The server provides the following tools:
 
 4. Run the server:
    ```bash
-   node dist/index.js
+   node dist/src/index.js
    ```
 
 ### Environment Variables
