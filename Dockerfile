@@ -2,10 +2,16 @@ FROM node:23-alpine AS builder
 
 WORKDIR /app
 
+# Copy package files first
 COPY package.json package-lock.json* ./
-RUN npm ci
 
+# Disable prepare script during npm ci to prevent premature build
+RUN npm ci --ignore-scripts
+
+# Copy the rest of the project files
 COPY . .
+
+# Now explicitly run the build
 RUN npm run build
 
 FROM node:23-alpine AS release
