@@ -86,7 +86,7 @@ const listCategoriesTool: Tool = {
 
 const listApiEndpointsTool: Tool = {
   name: "elevenlabs_list_api_endpoints",
-  description: "List available ElevenLabs API endpoints",
+  description: "List available ElevenLabs API endpoints (base URL: https://api.elevenlabs.io)",
   inputSchema: {
     type: "object",
     properties: {
@@ -105,13 +105,13 @@ const listApiEndpointsTool: Tool = {
 
 const getApiReferenceTool: Tool = {
   name: "elevenlabs_get_api_reference",
-  description: "Get API reference for a specific ElevenLabs API endpoint",
+  description: "Get API reference for a specific ElevenLabs API endpoint (base URL: https://api.elevenlabs.io)",
   inputSchema: {
     type: "object",
     properties: {
       endpoint: {
         type: "string",
-        description: "API endpoint path (e.g., '/v1/text-to-speech')",
+        description: "API endpoint path (e.g., '/v1/text-to-speech') to be used with base URL https://api.elevenlabs.io",
       },
     },
     required: ["endpoint"],
