@@ -82,7 +82,7 @@ To use this MCP server with Claude Desktop, add the following configuration to y
 ```json
 {
   "mcpServers": {
-    "elevenlabs": {
+    "elevenlabs-docs": {
       "command": "docker",
       "args": [
         "run",
@@ -90,7 +90,7 @@ To use this MCP server with Claude Desktop, add the following configuration to y
         "--rm",
         "-e",
         "GITHUB_TOKEN",
-        "ghcr.io/monotykamary/elevenlabs-docs:latest"
+        "ghcr.io/monotykamary/elevenlabs-docs-mcp"
       ],
       "env": {
         "GITHUB_TOKEN": "your_github_token_here"
