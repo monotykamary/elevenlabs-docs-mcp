@@ -142,7 +142,8 @@ const getApiReferenceTool: Tool = {
   },
 };
 
-class ElevenLabsClient {
+// Class definition should be marked as exported
+export class ElevenLabsClient {
   private githubHeaders: { Authorization?: string; "Content-Type": string };
   private readonly owner = "elevenlabs";
   private readonly repo = "elevenlabs-docs";
@@ -232,71 +233,195 @@ class ElevenLabsClient {
         throw new Error(`Failed to parse ${docsYmlPath}`);
       }
       
-      // Create a more accessible structure from the docs.yml
-      const structure = {
-        title: parsedYaml.title,
-        subtitle: parsedYaml.subtitle,
-        sections: [] as any[],
+      // Extract the documentation structure from the YAML
+      const structure: {
+        title: string;
+        tabs: Record<string, any>;
+        navigation: any[];
+        apiEndpoints?: any[];
+        error?: string;
+      } = {
+        title: parsedYaml.title || "ElevenLabs Documentation",
+        tabs: {} as Record<string, any>,
+        navigation: [] as any[],
       };
       
-      // Process sections
-      if (parsedYaml.sections) {
-        for (const section of parsedYaml.sections) {
-          const processedSection = {
-            title: section.title,
-            pages: [] as any[],
+      // Process tabs if they exist
+      if (parsedYaml.tabs) {
+        Object.keys(parsedYaml.tabs).forEach(tabKey => {
+          const tab = parsedYaml.tabs[tabKey];
+          structure.tabs[tabKey] = {
+            displayName: tab['display-name'] || tabKey,
+            skipSlug: tab['skip-slug'] || false
           };
-          
-          // Process pages in each section
-          if (section.pages) {
-            for (const page of section.pages) {
-              // If it's a reference to an API, fetch details if requested
-              if (includeApiDetails && typeof page === 'object' && page.api) {
-                try {
-                  const apiPath = `fern/apis/${page.api}/definition`;
-                  const apiContent = await this.getFileContent(apiPath);
-                  const apiYaml = yaml.load(apiContent) as any;
+        });
+      }
+      
+      // Process navigation which contains the actual structure
+      if (parsedYaml.navigation) {
+        for (const navItem of parsedYaml.navigation) {
+          if (navItem.tab) {
+            const tabStructure: any = {
+              tab: navItem.tab,
+              layout: [] as any[]
+            };
+            
+            // Process the layout which can contain sections
+            if (navItem.layout) {
+              for (const layoutItem of navItem.layout) {
+                // Handle sections
+                if (layoutItem.section) {
+                  const section = {
+                    title: layoutItem.section,
+                    skipSlug: layoutItem['skip-slug'] || false,
+                    contents: [] as any[]
+                  };
                   
-                  processedSection.pages.push({
-                    type: 'api',
-                    api: page.api,
-                    apiDetails: apiYaml,
-                  });
-                } catch (error) {
-                  // If we can't fetch the API details, just include the reference
-                  processedSection.pages.push({
-                    type: 'api',
-                    api: page.api,
-                    error: String(error),
+                  // Process contents of each section (pages, links, nested sections)
+                  if (layoutItem.contents) {
+                    for (const contentItem of layoutItem.contents) {
+                      // Page definition
+                      if (contentItem.page) {
+                        section.contents.push({
+                          type: 'page',
+                          title: contentItem.page,
+                          path: contentItem.path,
+                          icon: contentItem.icon
+                        });
+                      }
+                      // Link definition
+                      else if (contentItem.link) {
+                        section.contents.push({
+                          type: 'link',
+                          title: contentItem.link,
+                          href: contentItem.href,
+                          icon: contentItem.icon
+                        });
+                      }
+                      // Nested section
+                      else if (contentItem.section) {
+                        const nestedSection = {
+                          type: 'section',
+                          title: contentItem.section,
+                          skipSlug: contentItem['skip-slug'] || false,
+                          contents: [] as any[]
+                        };
+                        
+                        // Process nested section contents
+                        if (contentItem.contents) {
+                          for (const nestedItem of contentItem.contents) {
+                            if (nestedItem.page) {
+                              nestedSection.contents.push({
+                                type: 'page',
+                                title: nestedItem.page,
+                                path: nestedItem.path,
+                                icon: nestedItem.icon
+                              });
+                            } else if (nestedItem.link) {
+                              nestedSection.contents.push({
+                                type: 'link',
+                                title: nestedItem.link,
+                                href: nestedItem.href,
+                                icon: nestedItem.icon
+                              });
+                            }
+                          }
+                        }
+                        
+                        section.contents.push(nestedSection);
+                      }
+                    }
+                  }
+                  
+                  tabStructure.layout.push(section);
+                }
+                // Handle direct references to pages
+                else if (layoutItem.page) {
+                  tabStructure.layout.push({
+                    type: 'page',
+                    title: layoutItem.page,
+                    path: layoutItem.path,
+                    icon: layoutItem.icon
                   });
                 }
-              } 
-              // Regular page reference
-              else if (typeof page === 'string') {
-                processedSection.pages.push({
-                  type: 'page',
-                  path: page,
-                });
-              }
-              // Object with title and path
-              else if (typeof page === 'object') {
-                processedSection.pages.push({
-                  type: 'page',
-                  title: page.title,
-                  path: page.path,
-                });
+                // Handle changelog
+                else if (layoutItem.changelog) {
+                  tabStructure.layout.push({
+                    type: 'changelog',
+                    path: layoutItem.changelog,
+                    title: layoutItem.title,
+                    icon: layoutItem.icon
+                  });
+                }
               }
             }
+            
+            structure.navigation.push(tabStructure);
           }
+        }
+      }
+      
+      // If detailed API information is requested, enhance the structure
+      if (includeApiDetails) {
+        // Add API endpoint information if available
+        try {
+          const openApiPaths = await this.listContents("fern/apis", false);
           
-          structure.sections.push(processedSection);
+          if (openApiPaths) {
+            const apiEndpoints = [];
+            
+            for (const apiPath of openApiPaths) {
+              if (apiPath.type === "dir") {
+                try {
+                  const apiFiles = await this.listContents(apiPath.path, false);
+                  const openapiFile = apiFiles.find((file: any) => 
+                    file.name === "openapi.json" || 
+                    file.name === "openapi-overrides.yml"
+                  );
+                  
+                  if (openapiFile) {
+                    const apiContent = await this.getFileContent(openapiFile.path);
+                    let apiSpec;
+                    
+                    if (openapiFile.name.endsWith('.yml') || openapiFile.name.endsWith('.yaml')) {
+                      apiSpec = await this.processYaml(apiContent);
+                    } else {
+                      apiSpec = JSON.parse(apiContent);
+                    }
+                    
+                    if (apiSpec && apiSpec.paths) {
+                      const endpoints = Object.keys(apiSpec.paths).map(path => ({
+                        path,
+                        methods: Object.keys(apiSpec.paths[path]),
+                        category: apiPath.name
+                      }));
+                      
+                      apiEndpoints.push(...endpoints);
+                    }
+                  }
+                } catch (error) {
+                  console.error(`Error processing API directory ${apiPath.path}:`, error);
+                }
+              }
+            }
+            
+            if (apiEndpoints.length > 0) {
+              structure.apiEndpoints = apiEndpoints;
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching API details:", error);
         }
       }
       
       return structure;
     } catch (error) {
       console.error("Error getting docs structure:", error);
-      throw error;
+      // Return a minimal structure if we encounter an error
+      return {
+        title: "ElevenLabs Documentation",
+        error: String(error)
+      };
     }
   }
 
