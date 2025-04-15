@@ -71,6 +71,7 @@ export async function parseMarkdownFiles(basePath) {
                         content: extractedText,
                         lineNumber: lineNumber,
                         order: blockOrder++, // Store the order
+                        fullContent: content, // Add full file content as a new column
                     });
                 }
             });

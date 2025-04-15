@@ -84,9 +84,10 @@ async function runETL() {
                 language VARCHAR,
                 content VARCHAR,
                 lineNumber INTEGER,
-                "order" INTEGER
+                "order" INTEGER,
+                fullContent VARCHAR
             );`; // Use quotes for "order" as it's a reserved keyword
-        const mdColumns = ['filePath', 'fileName', 'heading1', 'heading2', 'heading3', 'contentType', 'language', 'content', 'lineNumber', 'order'];
+        const mdColumns = ['filePath', 'fileName', 'heading1', 'heading2', 'heading3', 'contentType', 'language', 'content', 'lineNumber', 'order', 'fullContent'];
         const mdParquetPath = path.join(outputDir, 'docs_content.parquet');
         // Removed stray closing comment -> */
 
