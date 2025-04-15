@@ -1,11 +1,9 @@
 import { DuckDBService } from "../services/DuckDBService.js"; // Changed import
 import { handleSearchDocs } from "./searchDocsHandler.js";
-import { handleGetDoc } from "./getDocHandler.js";
 import { handleSearchApiFiles } from "./searchApiFilesHandler.js";
 
 export {
   handleSearchDocs,
-  handleGetDoc,
 };
 
 export async function handleToolRequest(
@@ -18,8 +16,6 @@ export async function handleToolRequest(
     // Pass service instead of client, and args first for consistency if desired (or keep client/service first)
     case "elevenlabs_search_docs":
       return handleSearchDocs(args, service); // Pass service
-    case "elevenlabs_get_doc":
-      return handleGetDoc(args, service); // Pass service
     case "elevenlabs_search_api_files":
       return handleSearchApiFiles(args, service); // Pass service
     default:
