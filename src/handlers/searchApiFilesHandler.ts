@@ -1,5 +1,8 @@
-import { ElevenLabsClient } from "../services/ElevenLabsClient.js";
+import { DuckDBService } from "../services/DuckDBService.js"; // Changed import
+// Import common result type and args type if defined, otherwise define locally or import later
+import { SearchDocsResultItem } from "../types/interfaces.js";
 
+// Define args locally if not in interfaces.ts, ensuring it matches tool definition
 interface SearchApiFilesArgs {
   query: string;
   linesContext?: number;
@@ -76,57 +79,65 @@ function extractSnippets(
   return matches;
 }
 
+// Changed client to service: DuckDBService and adjusted args order
 export async function handleSearchApiFiles(
-  client: ElevenLabsClient,
-  args: SearchApiFilesArgs
-): Promise<any> {
+  args: SearchApiFilesArgs,
+  service: DuckDBService
+): Promise<any> { // Keep Promise<any> for now
   if (!args.query) {
     throw new Error("Missing required argument: query");
   }
-  const linesContext = args.linesContext ?? 16;
-  const fullFile = args.fullFile ?? false;
+  const { query, linesContext = 16, fullFile = false } = args;
+  const searchQuery = `%${query}%`; // Prepare for ILIKE
 
-  const apiSpecFiles = [
-    "fern/apis/api/asyncapi.yml",
-    "fern/apis/api/generators.yml",
-    "fern/apis/api/openapi-overrides.yml",
-    "fern/apis/api/openapi.json",
-    "fern/apis/convai/asyncapi.yml",
-    "fern/apis/convai/generators.yml",
-    "fern/apis/convai/openapi.json",
+  // Construct the SQL query to search only the api_spec Parquet file
+  const sql = `
+    SELECT
+      filePath,
+      fileName,
+      content,
+      lineNumber,
+      summary,
+      description,
+      apiPath,
+      method
+    FROM read_parquet(?) -- api_spec.parquet path
+    WHERE
+      content ILIKE ? OR summary ILIKE ? OR description ILIKE ? OR apiPath ILIKE ? OR method ILIKE ?
+    -- No LIMIT here, assuming the tool definition doesn't specify one for this specific tool
+    -- If a limit is needed, add LIMIT ? and pass args.limit ?? some_default
+  `;
+
+  const params = [
+    service.getApiSpecPath(), // Path to api_spec.parquet
+    searchQuery, // content
+    searchQuery, // summary
+    searchQuery, // description
+    searchQuery, // apiPath
+    searchQuery, // method
   ];
 
-  const results = await Promise.all(
-    apiSpecFiles.map(async (path) => {
-      try {
-        const content = await client.getFileContent(path);
-        if (fullFile) {
-          if (content.toLowerCase().includes(args.query.toLowerCase())) {
-            return [{
-              name: path.split("/").pop(),
-              path,
-              snippet: content,
-              lineNumber: null,
-              section: undefined,
-            }];
-          }
-        } else {
-          const snippets = extractSnippets(content, args.query, linesContext);
-          return snippets.map(({ snippet, section, lineNumber }) => ({
-            name: path.split("/").pop(),
-            path,
-            snippet,
-            lineNumber,
-            section,
-          }));
-        }
-      } catch (e) {
-        // Ignore missing files
-      }
-      return [];
-    })
-  );
+  const dbResults = await service.executeQuery(sql, params);
 
-  // Flatten results and filter out empty arrays
-  return { results: results.flat().filter(Boolean) };
+  // TODO: Implement snippet generation based on linesContext and fullFile.
+  // Similar complexity as in searchDocsHandler.
+  // For now, return raw matched content as snippet and format section.
+
+  const formattedResults: SearchDocsResultItem[] = dbResults.map((row: any) => {
+    // Determine section based on available API info
+    const section = row.apiPath ? `${row.apiPath} (${row.method})` : row.summary;
+
+    return {
+      name: row.fileName,
+      path: row.filePath,
+      repository: "elevenlabs/elevenlabs-docs", // Assuming constant repo
+      url: `https://github.com/elevenlabs/elevenlabs-docs/blob/main/${row.filePath}`, // Construct URL
+      snippet: row.content, // Placeholder: Use matched content directly for now
+      section: section || undefined,
+      lineNumber: row.lineNumber,
+    };
+  });
+
+  // Return results in the expected format
+  return { results: formattedResults };
 }

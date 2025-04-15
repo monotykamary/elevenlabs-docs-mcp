@@ -11,6 +11,12 @@
     "skipLibCheck": true
   },
   "include": [
-    "./**/*.ts"
+    "src/**/*.ts" // Be more specific to only include source files
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "elevenlabs-docs", // Exclude the submodule
+    "etl" // Exclude the ETL scripts directory
   ]
 }

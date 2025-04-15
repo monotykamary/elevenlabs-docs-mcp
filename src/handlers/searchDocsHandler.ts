@@ -1,5 +1,5 @@
-import { ElevenLabsClient } from "../services/ElevenLabsClient.js";
-import { SearchDocsArgs } from "../types/interfaces.js";
+import { DuckDBService } from "../services/DuckDBService.js"; // Changed import
+import { SearchDocsArgs, SearchDocsResultItem } from "../types/interfaces.js"; // Corrected import to SearchDocsResultItem
 
 function extractSnippet(
   content: string,
@@ -48,82 +48,107 @@ function extractSnippet(
   return { snippet, section, lineNumber: matchLine + 1 };
 }
 
+// Changed client to service: DuckDBService and adjusted args order
 export async function handleSearchDocs(
-  client: ElevenLabsClient,
-  args: SearchDocsArgs
-): Promise<any> {
+  args: SearchDocsArgs,
+  service: DuckDBService
+): Promise<any> { // Keep Promise<any> for now, refine later if needed
   if (!args.query) {
     throw new Error("Missing required argument: query");
   }
 
-  const response = await client.searchCode(args.query, args.limit);
+  const { query, limit = 10, linesContext = 16, fullFile = false } = args; // Use args from tool definition
+  const searchQuery = `%${query}%`; // Prepare for ILIKE
 
-  // For each result, fetch file content and extract snippet/context
-  const codeResults = await Promise.all(
-    response.items.map(async (item: any) => {
-      let snippet = "";
-      let section: string | undefined = undefined;
-      let lineNumber: number | undefined = undefined;
-      try {
-        const content = await client.getFileContent(item.path);
-        const { snippet: snip, section: sec, lineNumber: ln } = extractSnippet(content, args.query, 1);
-        snippet = snip;
-        section = sec;
-        lineNumber = ln;
-      } catch (e) {
-        snippet = "(Could not fetch file content for snippet)";
-      }
-      return {
-        name: item.name,
-        path: item.path,
-        repository: item.repository.full_name,
-        url: item.html_url,
-        snippet,
-        section,
+  // Construct the SQL query to search both Parquet files
+  const sql = `
+    WITH combined_results AS (
+      SELECT
+        filePath,
+        fileName,
+        content,
         lineNumber,
-      };
-    })
-  );
+        'api' as sourceType,
+        summary,
+        description,
+        apiPath,
+        method,
+        NULL as heading1, -- Placeholder columns for UNION ALL
+        NULL as heading2,
+        NULL as heading3,
+        NULL as contentType,
+        NULL as language,
+        "order" -- Keep order if needed for context fetching
+      FROM read_parquet(?) -- api_spec.parquet path
+      WHERE
+        content ILIKE ? OR summary ILIKE ? OR description ILIKE ? OR apiPath ILIKE ? OR method ILIKE ?
 
-  // Add explicit search for API spec files in fern/apis/api/* and fern/apis/convai/*
-  const apiSpecFiles = [
-    "fern/apis/api/asyncapi.yml",
-    "fern/apis/api/generators.yml",
-    "fern/apis/api/openapi-overrides.yml",
-    "fern/apis/api/openapi.json",
-    "fern/apis/convai/asyncapi.yml",
-    "fern/apis/convai/generators.yml",
-    "fern/apis/convai/openapi.json",
+      UNION ALL
+
+      SELECT
+        filePath,
+        fileName,
+        content,
+        lineNumber,
+        'markdown' as sourceType,
+        NULL as summary, -- Placeholder columns
+        NULL as description,
+        NULL as apiPath,
+        NULL as method,
+        heading1,
+        heading2,
+        heading3,
+        contentType,
+        language,
+        "order"
+      FROM read_parquet(?) -- docs_content.parquet path
+      WHERE content ILIKE ?
+    )
+    SELECT * FROM combined_results
+    ORDER BY filePath, "order" -- Order results for potential context fetching later
+    LIMIT ?;
+  `;
+
+  const params = [
+    service.getApiSpecPath(), // Path to api_spec.parquet
+    searchQuery, // api: content
+    searchQuery, // api: summary
+    searchQuery, // api: description
+    searchQuery, // api: apiPath
+    searchQuery, // api: method
+    service.getDocsContentPath(), // Path to docs_content.parquet
+    searchQuery, // md: content
+    limit // LIMIT clause
   ];
 
-  const apiSpecResults = await Promise.all(
-    apiSpecFiles.map(async (path) => {
-      try {
-        const content = await client.getFileContent(path);
-        const { snippet, section, lineNumber } = extractSnippet(content, args.query, 2);
-        if (snippet && snippet.trim().length > 0 && lineNumber) {
-          return {
-            name: path.split("/").pop(),
-            path,
-            repository: "elevenlabs/elevenlabs-docs",
-            url: `https://github.com/elevenlabs/elevenlabs-docs/blob/main/${path}`,
-            snippet,
-            section,
-            lineNumber,
-          };
-        }
-      } catch (e) {
-        // Ignore missing files
-      }
-      return null;
-    })
-  );
+  const dbResults = await service.executeQuery(sql, params);
 
-  // Filter out nulls and merge results
-  const results = [
-    ...codeResults,
-    ...apiSpecResults.filter(Boolean)
-  ];
+  // TODO: Implement snippet generation based on linesContext and fullFile.
+  // This is more complex now as we don't have the full file content readily available.
+  // Option 1: Fetch surrounding rows from Parquet based on filePath and order/lineNumber.
+  // Option 2: If fullFile is true, read the original file from /app/elevenlabs-docs using fs.
+  // Option 3: Add full file content to Parquet during ETL (increases size).
 
-  return { results };
+  // For now, return raw matched content as snippet and format section
+  const formattedResults: SearchDocsResultItem[] = dbResults.map((row: any) => {
+    let section: string | undefined = undefined;
+    if (row.sourceType === 'api') {
+      section = row.apiPath ? `${row.apiPath} (${row.method})` : row.summary;
+    } else if (row.sourceType === 'markdown') {
+      section = [row.heading1, row.heading2, row.heading3].filter(Boolean).join(' > ');
+    }
+
+    return {
+      name: row.fileName,
+      path: row.filePath,
+      repository: "elevenlabs/elevenlabs-docs", // Assuming constant repo
+      url: `https://github.com/elevenlabs/elevenlabs-docs/blob/main/${row.filePath}`, // Construct URL
+      snippet: row.content, // Placeholder: Use matched content directly for now
+      section: section || undefined,
+      lineNumber: row.lineNumber,
+    };
+  });
+
+  // Return results in the expected format for the MCP SDK
+  return { results: formattedResults };
 }

@@ -1,6 +1,9 @@
 {
-  "$schema":  "https://raw.githubusercontent.com/jetify-com/devbox/0.14.0/.schema/devbox.schema.json",
-  "packages": ["nodejs@23.10.0"],
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.14.0/.schema/devbox.schema.json",
+  "packages": [
+    "nodejs@23.10.0",
+    "duckdb@1.2.1"
+  ],
   "shell": {
     "init_hook": [
       "echo 'Welcome to devbox!' > /dev/null"

@@ -8,7 +8,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { allTools } from "./tools/definitions.js";
-import { ElevenLabsClient } from "./services/ElevenLabsClient.js";
+// Removed ElevenLabsClient import
+import { DuckDBService } from "./services/DuckDBService.js"; // Added DuckDBService import
 import { handleToolRequest } from "./handlers/index.js";
 
 async function main() {
@@ -27,7 +28,9 @@ async function main() {
     },
   );
 
-  const elevenLabsClient = new ElevenLabsClient(githubToken);
+  // Instantiate DuckDBService instead of ElevenLabsClient
+  const duckDBService = new DuckDBService();
+  // We might need a way to gracefully close the DB connection on server shutdown later
 
   server.setRequestHandler(
     CallToolRequestSchema,
@@ -38,10 +41,11 @@ async function main() {
           throw new Error("No arguments provided");
         }
 
+        // Pass duckDBService to the handler
         const result = await handleToolRequest(
           request.params.name,
           request.params.arguments,
-          elevenLabsClient
+          duckDBService // Pass the DuckDB service instance
         );
 
         return {

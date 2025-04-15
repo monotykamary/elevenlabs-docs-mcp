@@ -2,6 +2,8 @@
 export interface SearchDocsArgs {
   query: string;
   limit?: number;
+  linesContext?: number; // Added to match tool definition
+  fullFile?: boolean;   // Added to match tool definition
 }
 
 export interface SearchDocsResultItem {
