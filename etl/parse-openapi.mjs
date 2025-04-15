@@ -97,6 +97,13 @@ export async function parseOpenApiFiles(basePath, debug = false) { // Added debu
                      const schema = spec.components.schemas[schemaName];
                      // Example: Add schema descriptions to searchable content
                      // This could be a separate entry or merged somehow
+                     // Avoid duplicate content like "ModelName ModelName"
+                     let content = '';
+                     if (schema.title && schema.title !== schemaName) {
+                         content = `${schema.title} ${schema.description || ''}`;
+                     } else {
+                         content = schema.description || '';
+                     }
                      apiData.push({
                          filePath: relativePath,
                          fileName: fileName,
@@ -105,8 +112,9 @@ export async function parseOpenApiFiles(basePath, debug = false) { // Added debu
                          method: null,
                          summary: schema.title || schemaName,
                          description: schema.description || null,
-                         content: `${schemaName} ${schema.title || ''} ${schema.description || ''}`, // Basic searchable text
+                         content: content.trim(),
                          lineNumber: null,
+                         schemaDefinition: JSON.stringify(schema, null, 2), // Add full schema definition
                      });
                  }
             }

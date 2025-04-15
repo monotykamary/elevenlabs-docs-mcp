@@ -54,9 +54,10 @@ async function runETL() {
                 summary VARCHAR,
                 description VARCHAR,
                 content VARCHAR,
-                lineNumber INTEGER
+                lineNumber INTEGER,
+                schemaDefinition VARCHAR
             );`;
-        const apiColumns = ['filePath', 'fileName', 'type', 'apiPath', 'method', 'summary', 'description', 'content', 'lineNumber'];
+        const apiColumns = ['filePath', 'fileName', 'type', 'apiPath', 'method', 'summary', 'description', 'content', 'lineNumber', 'schemaDefinition'];
         const apiParquetPath = path.join(outputDir, 'api_spec.parquet');
 
         // --- DEBUG: Simplified Markdown Content Schema (Commented out) ---
