@@ -72,6 +72,22 @@ An array of results with the following fields:
 
 To use this MCP server with Claude Desktop, add the appropriate configuration to your Claude Desktop settings to launch the Docker container for this server.
 
+```json
+{
+  "mcpServers": {
+    "elevenlabs-docs": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "ghcr.io/monotykamary/elevenlabs-docs-mcp"
+      ]
+    }
+  }
+}
+```
+
 With this configuration:
 1. Claude will automatically start the Docker container when needed.
 2. The container will be removed when Claude Desktop is closed.
