@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server for interacting with ElevenLabs documentation. This is really a glorified GitHub MCP server point it to their `fern` docs on GitHub.
 
+![alt text](image.png)
+
 ## Overview
 
 This MCP server provides tools to access and search ElevenLabs documentation directly from Claude via the Model Context Protocol. It retrieves documentation from the official ElevenLabs documentation repository and provides structured access to API references and guides.
