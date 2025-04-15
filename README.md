@@ -1,6 +1,6 @@
 # ElevenLabs Documentation MCP Server
 
-A Model Context Protocol (MCP) server for interacting with ElevenLabs documentation. This is really a glorified GitHub MCP server point it to their `fern` docs on GitHub.
+A Model Context Protocol (MCP) server for interacting with ElevenLabs documentation. This server provides tools to access and search ElevenLabs documentation and API spec files directly via the Model Context Protocol.
 
 ![alt text](image.png)
 
@@ -12,32 +12,22 @@ This MCP server provides tools to access and search ElevenLabs documentation dir
 
 The server provides the following tools:
 
-1. **elevenlabs_search_docs**: Search ElevenLabs documentation based on keywords.
+1. **elevenlabs_search_docs**: Search ElevenLabs documentation and API spec files (e.g., asyncapi.yml, openapi.json) based on keywords.
    - Parameters:
      - `query` (required): Search query or keywords
      - `limit` (optional): Maximum number of results to return (default: 10)
+     - `linesContext` (optional): Number of context lines to include before and after the match (default: 16)
+     - `fullFile` (optional): If true, returns the entire file content for each match (default: false)
 
 2. **elevenlabs_get_doc**: Get specific ElevenLabs document content by path.
    - Parameters:
      - `path` (required): Document path relative to the fern directory
 
-3. **elevenlabs_get_docs_structure**: Retrieve and parse the docs.yml file to understand the documentation structure.
+3. **elevenlabs_search_api_files**: Fuzzy search inside ElevenLabs API spec files (e.g., asyncapi.yml, openapi.json) for keywords.
    - Parameters:
-     - `includeApiDetails` (optional): Whether to include detailed API information or just the structure (default: false)
-
-4. **elevenlabs_list_repository_path**: List files and directories at a specific path in the repository.
-   - Parameters:
-     - `path` (required): Path to list (relative to repository root)
-     - `depth` (optional): How many levels deep to traverse (default: 1)
-
-5. **elevenlabs_list_api_endpoints**: List available ElevenLabs API endpoints.
-   - Parameters:
-     - `category` (optional): API category to filter endpoints
-     - `limit` (optional): Maximum number of endpoints to return (default: 20)
-
-6. **elevenlabs_get_api_reference**: Get API reference for a specific ElevenLabs API endpoint.
-   - Parameters:
-     - `endpoint` (required): API endpoint path (e.g., '/v1/text-to-speech')
+     - `query` (required): Search query or keywords
+     - `linesContext` (optional): Number of context lines to include before and after the match (default: 16)
+     - `fullFile` (optional): If true, returns the entire file content for each match (default: false)
 
 ## Setup
 
@@ -116,28 +106,22 @@ To avoid rate limiting issues with GitHub, it's recommended to provide a GitHub 
 
 ## Usage Examples
 
-### Example 1: Searching for Text-to-Speech Documentation
+### Example 1: Searching for Documentation and API Specs
 
 ```
-mcp_elevenlabs_search_docs(query="text to speech tutorial", limit=5)
+mcp_elevenlabs_search_docs(query="text to speech tutorial", limit=5, linesContext=8)
 ```
 
-### Example 2: Getting API Reference for a Specific Endpoint
+### Example 2: Getting a Specific Document
 
 ```
-mcp_elevenlabs_get_api_reference(endpoint="/v1/text-to-speech")
+mcp_elevenlabs_get_doc(path="fern/apis/api/openapi.json")
 ```
 
-### Example 3: Getting Documentation Structure
+### Example 3: Fuzzy Searching API Spec Files
 
 ```
-mcp_elevenlabs_get_docs_structure(includeApiDetails=false)
-```
-
-### Example 4: Exploring Repository Files
-
-```
-mcp_elevenlabs_list_repository_path(path="fern/apis", depth=2)
+mcp_elevenlabs_search_api_files(query="voice_id", linesContext=4, fullFile=false)
 ```
 
 ## Troubleshooting
