@@ -34,6 +34,93 @@ function extractOperationText(operation) {
 export async function parseOpenApiFiles(basePath, debug = false) { // Added debug flag parameter back
     console.log('Parsing API specification files...');
     const apiData = [];
+    const seenSchemas = new Set(); // To avoid duplicate schemas
+    const schemaUsage = {}; // Map schemaName (or hash) -> array of {apiPath, method, operationId}
+
+    // Helper to add schema if not already present, and track usage
+    // Safe JSON stringify to handle circular references
+    function safeStringify(obj) {
+        const seen = new WeakSet();
+        return JSON.stringify(obj, function (key, value) {
+            if (typeof value === "object" && value !== null) {
+                if (seen.has(value)) {
+                    return "[Circular]";
+                }
+                seen.add(value);
+            }
+            return value;
+        }, 2);
+    }
+
+    function addSchemaEntry({ schema, schemaName, filePath, fileName, usedBy }) {
+        // Use schemaName if available, else hash the schema
+        const key = schemaName || safeStringify(schema);
+        if (!seenSchemas.has(key)) {
+            seenSchemas.add(key);
+            let content = '';
+            if (schema.title && schema.title !== schemaName) {
+                content = `${schema.title} ${schema.description || ''}`;
+            } else {
+                content = schema.description || '';
+            }
+            apiData.push({
+                filePath,
+                fileName,
+                type: 'schema',
+                apiPath: null,
+                method: null,
+                summary: schema.title || schemaName,
+                description: schema.description || null,
+                content: content.trim(),
+                lineNumber: null,
+                schemaDefinition: safeStringify(schema),
+                usedBy: usedBy ? JSON.stringify([usedBy]) : JSON.stringify([])
+            });
+            if (usedBy) {
+                schemaUsage[key] = [usedBy];
+            }
+        } else if (usedBy) {
+            // Add usage to existing entry
+            if (!schemaUsage[key]) schemaUsage[key] = [];
+            schemaUsage[key].push(usedBy);
+        }
+    }
+
+    // Helper to extract schemas from requestBody, responses, parameters
+    function extractSchemasFromOperation(operation, filePath, fileName, apiPath, method) {
+        const usedBy = { apiPath, method, operationId: operation.operationId || null };
+        // requestBody
+        if (operation.requestBody && operation.requestBody.content) {
+            for (const contentType in operation.requestBody.content) {
+                const reqSchema = operation.requestBody.content[contentType].schema;
+                if (reqSchema) {
+                    addSchemaEntry({ schema: reqSchema, schemaName: reqSchema.title, filePath, fileName, usedBy });
+                }
+            }
+        }
+        // responses
+        if (operation.responses) {
+            for (const status in operation.responses) {
+                const resp = operation.responses[status];
+                if (resp && resp.content) {
+                    for (const contentType in resp.content) {
+                        const respSchema = resp.content[contentType].schema;
+                        if (respSchema) {
+                            addSchemaEntry({ schema: respSchema, schemaName: respSchema.title, filePath, fileName, usedBy });
+                        }
+                    }
+                }
+            }
+        }
+        // parameters
+        if (operation.parameters) {
+            for (const param of operation.parameters) {
+                if (param.schema) {
+                    addSchemaEntry({ schema: param.schema, schemaName: param.schema.title, filePath, fileName, usedBy });
+                }
+            }
+        }
+    }
     // --- DEBUG: Simplest possible regex - only match openapi.json ---
     const apiPattern = /openapi\.json/i;
 
@@ -86,37 +173,28 @@ export async function parseOpenApiFiles(basePath, debug = false) { // Added debu
                             content: content, // Combined searchable text
                             lineNumber: null, // Line numbers are hard to get accurately from parsed structure
                         });
+                        // Extract and save schemas used by this operation
+                        extractSchemasFromOperation(operation, relativePath, fileName, apiPath, method.toUpperCase());
                     }
                 }
             }
 
             // --- Extract Component Schema Data (Example) ---
-            // You might want separate entries or enrich the path entries
             if (spec.components && spec.components.schemas) {
-                 for (const schemaName in spec.components.schemas) {
-                     const schema = spec.components.schemas[schemaName];
-                     // Example: Add schema descriptions to searchable content
-                     // This could be a separate entry or merged somehow
-                     // Avoid duplicate content like "ModelName ModelName"
-                     let content = '';
-                     if (schema.title && schema.title !== schemaName) {
-                         content = `${schema.title} ${schema.description || ''}`;
-                     } else {
-                         content = schema.description || '';
-                     }
-                     apiData.push({
-                         filePath: relativePath,
-                         fileName: fileName,
-                         type: 'schema',
-                         apiPath: null, // Or link to paths using this schema
-                         method: null,
-                         summary: schema.title || schemaName,
-                         description: schema.description || null,
-                         content: content.trim(),
-                         lineNumber: null,
-                         schemaDefinition: JSON.stringify(schema, null, 2), // Add full schema definition
-                     });
-                 }
+                for (const schemaName in spec.components.schemas) {
+                    const schema = spec.components.schemas[schemaName];
+                    addSchemaEntry({ schema, schemaName, filePath: relativePath, fileName, usedBy: null });
+                }
+            }
+
+            // After all, update usedBy arrays in apiData for schemas
+            for (const entry of apiData) {
+                if (entry.type === 'schema') {
+                    const key = entry.summary || entry.schemaDefinition;
+                    if (schemaUsage[key]) {
+                        entry.usedBy = JSON.stringify(schemaUsage[key]);
+                    }
+                }
             }
 
             // Add extraction for AsyncAPI channels if needed

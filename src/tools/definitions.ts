@@ -10,7 +10,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 export const searchDocsTool: Tool = {
   name: "elevenlabs_search_docs",
   description:
-    "Searches indexed ElevenLabs documentation and API spec content (from DuckDB Parquet files: docs_content.parquet and api_spec.parquet) based on keywords. This tool does NOT open or read large files directly—results are limited to what is present in the indexed data. Returns file name, path, a snippet of matching content, repository, url, line number, and (if available) section/heading for each result.",
+    "Searches indexed ElevenLabs documentation and API spec content (from DuckDB Parquet files: docs_content.parquet and api_spec.parquet) based on keywords. This tool is optimized to help you discover and explore request/response models and schema definitions in the API spec. When searching, pay close attention to model/schema names (such as UpdatePhoneNumberRequest) surfaced in the results—these can be used for direct follow-up queries to retrieve full schema details. Use this tool to uncover relevant request/response types, understand their structure, and leverage model names for deeper exploration of the API and documentation. This tool does NOT open or read large files directly—results are limited to what is present in the indexed data. Returns file name, path, a snippet of matching content (with model/schema name for API spec results), repository, url, line number, and (if available) section/heading for each result.",
   inputSchema: {
     type: "object",
     properties: {
