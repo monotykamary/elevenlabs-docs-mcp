@@ -1,7 +1,10 @@
 FROM node:23-alpine AS builder
 
-# Install git for submodules
-RUN apk add --no-cache git
+# Install git for submodules and curl for installing DuckDB
+RUN apk add --no-cache git curl
+
+# Install DuckDB CLI (latest) using official install script
+RUN curl https://install.duckdb.org | sh
 
 WORKDIR /app
 
@@ -34,6 +37,10 @@ RUN npm run build
 
 # --- Release Stage ---
 FROM node:23-alpine AS release
+
+# Install curl and DuckDB CLI (latest) in release image
+RUN apk add --no-cache curl \
+    && curl https://install.duckdb.org | sh
 
 WORKDIR /app
 
