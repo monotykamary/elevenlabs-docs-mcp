@@ -23,12 +23,6 @@ The server provides the following tools:
    - Parameters:
      - `path` (required): Document path relative to the fern directory
 
-3. **elevenlabs_search_api_files**: Fuzzy search inside ElevenLabs API spec files (e.g., asyncapi.yml, openapi.json) for keywords.
-   - Parameters:
-     - `query` (required): Search query or keywords
-     - `linesContext` (optional): Number of context lines to include before and after the match (default: 16)
-     - `fullFile` (optional): If true, returns the entire file content for each match (default: false)
-
 ## Setup
 
 ### Local Development
@@ -118,11 +112,6 @@ mcp_elevenlabs_search_docs(query="text to speech tutorial", limit=5, linesContex
 mcp_elevenlabs_get_doc(path="fern/apis/api/openapi.json")
 ```
 
-### Example 3: Fuzzy Searching API Spec Files
-
-```
-mcp_elevenlabs_search_api_files(query="voice_id", linesContext=4, fullFile=false)
-```
 
 ## Troubleshooting
 

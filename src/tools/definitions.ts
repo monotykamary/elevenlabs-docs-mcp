@@ -63,43 +63,7 @@ export const searchDocsTool: Tool = {
 };
 
 
-// Queries only the api_spec.parquet file for API spec search.
-export const searchApiFilesTool: Tool = {
-  name: "elevenlabs_search_api_files",
-  description:
-    "Fuzzy searches indexed ElevenLabs API spec content (from api_spec.parquet in DuckDB) for keywords. This tool does NOT open or read large files directly—results are limited to what is present in the indexed data. Returns file name, path, a snippet of matching content, line number, and section/heading for each result.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      query: {
-        type: "string",
-        description: "Search query or keywords (applies to content, summary, description, apiPath, method fields)",
-      },
-    },
-    required: ["query"],
-  },
-  outputSchema: {
-    type: "object",
-    properties: {
-      results: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            name: { type: "string" },
-            path: { type: "string" },
-            snippet: { type: "string" },
-            lineNumber: { type: "number" },
-            section: { type: "string" },
-            schemaDefinition: { type: "string" }
-          },
-          required: ["name", "path", "snippet"]
-        }
-      }
-    },
-    required: ["results"]
-  }
-};
+
 
 // Export all tools
-export const allTools = [searchDocsTool, searchApiFilesTool];
+export const allTools = [searchDocsTool];
