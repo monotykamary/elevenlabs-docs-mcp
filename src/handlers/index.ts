@@ -1,6 +1,7 @@
 import { ElevenLabsClient } from "../services/ElevenLabsClient.js";
 import { handleSearchDocs } from "./searchDocsHandler.js";
 import { handleGetDoc } from "./getDocHandler.js";
+import { handleSearchApiFiles } from "./searchApiFilesHandler.js";
 
 export {
   handleSearchDocs,
@@ -17,6 +18,8 @@ export async function handleToolRequest(
       return handleSearchDocs(client, args);
     case "elevenlabs_get_doc":
       return handleGetDoc(client, args);
+    case "elevenlabs_search_api_files":
+      return handleSearchApiFiles(client, args);
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }
