@@ -1,25 +1,20 @@
-import { ElevenLabsClient } from "../services/ElevenLabsClient.js";
+import { DuckDBService } from "../services/DuckDBService.js"; // Changed import
 import { handleSearchDocs } from "./searchDocsHandler.js";
-import { handleGetDoc } from "./getDocHandler.js";
-import { handleSearchApiFiles } from "./searchApiFilesHandler.js";
 
 export {
   handleSearchDocs,
-  handleGetDoc,
 };
 
 export async function handleToolRequest(
   toolName: string,
   args: any,
-  client: ElevenLabsClient
+  // Changed client type to DuckDBService
+  service: DuckDBService
 ): Promise<any> {
   switch (toolName) {
+    // Pass service instead of client, and args first for consistency if desired (or keep client/service first)
     case "elevenlabs_search_docs":
-      return handleSearchDocs(client, args);
-    case "elevenlabs_get_doc":
-      return handleGetDoc(client, args);
-    case "elevenlabs_search_api_files":
-      return handleSearchApiFiles(client, args);
+      return handleSearchDocs(args, service); // Pass service
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }

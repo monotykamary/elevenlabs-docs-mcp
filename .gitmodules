@@ -1,0 +1,3 @@
+[submodule "elevenlabs-docs"]
+	path = elevenlabs-docs
+	url = https://github.com/elevenlabs/elevenlabs-docs/

@@ -2,6 +2,8 @@
 export interface SearchDocsArgs {
   query: string;
   limit?: number;
+  includeFullContent?: boolean;
+  includeSchemaDefinition?: boolean;
 }
 
 export interface SearchDocsResultItem {
