@@ -3,8 +3,7 @@ import { SearchDocsArgs, SearchDocsResultItem } from "../types/interfaces.js"; /
 
 function extractSnippet(
   content: string,
-  query: string,
-  linesContext: number = 2
+  query: string
 ): { snippet: string; section?: string; lineNumber?: number } {
   const lines = content.split(/\r?\n/);
   const lowerQuery = query.toLowerCase();
@@ -23,10 +22,8 @@ function extractSnippet(
     return { snippet: lines.slice(0, 3).join('\n') };
   }
 
-  // Extract context lines around the match
-  const start = Math.max(0, matchLine - linesContext);
-  const end = Math.min(lines.length, matchLine + linesContext + 1);
-  const snippet = lines.slice(start, end).join('\n');
+  // Only return the matching line as the snippet
+  const snippet = lines[matchLine];
 
   // Try to find the nearest preceding heading (Markdown or YAML)
   let section: string | undefined = undefined;
@@ -57,7 +54,7 @@ export async function handleSearchDocs(
     throw new Error("Missing required argument: query");
   }
 
-  const { query, limit = 10, linesContext = 16, fullFile = false } = args; // Use args from tool definition
+  const { query, limit = 10 } = args; // Use args from tool definition
   const searchQuery = `%${query}%`; // Prepare for ILIKE
 
   // Construct the SQL query to search both Parquet files
@@ -77,8 +74,7 @@ export async function handleSearchDocs(
         NULL as heading2,
         NULL as heading3,
         NULL as contentType,
-        NULL as language,
-        "order" -- Keep order if needed for context fetching
+        NULL as language
       FROM read_parquet(?) -- api_spec.parquet path
       WHERE
         content ILIKE ? OR summary ILIKE ? OR description ILIKE ? OR apiPath ILIKE ? OR method ILIKE ?
@@ -99,13 +95,12 @@ export async function handleSearchDocs(
         heading2,
         heading3,
         contentType,
-        language,
-        "order"
+        language
       FROM read_parquet(?) -- docs_content.parquet path
       WHERE content ILIKE ?
     )
     SELECT * FROM combined_results
-    ORDER BY filePath, "order" -- Order results for potential context fetching later
+    ORDER BY filePath
     LIMIT ?;
   `;
 
@@ -129,7 +124,7 @@ export async function handleSearchDocs(
   // Option 2: If fullFile is true, read the original file from /app/elevenlabs-docs using fs.
   // Option 3: Add full file content to Parquet during ETL (increases size).
 
-  // For now, return raw matched content as snippet and format section
+  // For each result, return either the full file or a snippet with context
   const formattedResults: SearchDocsResultItem[] = dbResults.map((row: any) => {
     let section: string | undefined = undefined;
     if (row.sourceType === 'api') {
@@ -138,17 +133,23 @@ export async function handleSearchDocs(
       section = [row.heading1, row.heading2, row.heading3].filter(Boolean).join(' > ');
     }
 
+    // Always extract a snippet with context lines
+    const snippetObj = extractSnippet(row.content, query);
+    let snippet = snippetObj.snippet;
+    let lineNumber: number | undefined = row.lineNumber;
+    if (snippetObj.lineNumber) lineNumber = snippetObj.lineNumber;
+    if (snippetObj.section) section = snippetObj.section;
+
     return {
       name: row.fileName,
       path: row.filePath,
-      repository: "elevenlabs/elevenlabs-docs", // Assuming constant repo
-      url: `https://github.com/elevenlabs/elevenlabs-docs/blob/main/${row.filePath}`, // Construct URL
-      snippet: row.content, // Placeholder: Use matched content directly for now
+      repository: "elevenlabs/elevenlabs-docs",
+      url: `https://github.com/elevenlabs/elevenlabs-docs/blob/main/${row.filePath}`,
+      snippet,
       section: section || undefined,
-      lineNumber: row.lineNumber,
+      lineNumber,
     };
   });
 
-  // Return results in the expected format for the MCP SDK
   return { results: formattedResults };
 }
