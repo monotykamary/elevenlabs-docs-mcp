@@ -18,10 +18,20 @@ export const searchDocsTool: Tool = {
         type: "string",
         description: "Search query or keywords (applies to content, summary, description, apiPath, method fields)",
       },
+      includeFullContent: {
+        type: "boolean",
+        description: "If true, include the fullContent column (full document text) in results (docs search only).",
+        default: false
+      },
       limit: {
         type: "number",
         description: "Maximum number of results to return (default 10)",
         default: 10,
+      },
+      includeSchemaDefinition: {
+        type: "boolean",
+        description: "If true, include the schemaDefinition column (full JSON schema) in results (API spec search only).",
+        default: false
       },
     },
     required: ["query"],
@@ -41,7 +51,8 @@ export const searchDocsTool: Tool = {
             repository: { type: "string" },
             url: { type: "string" },
             lineNumber: { type: "number" },
-            section: { type: "string" }
+            section: { type: "string" },
+            fullContent: { type: "string" }
           },
           required: ["name", "path", "snippet", "repository", "url"]
         }
@@ -51,32 +62,6 @@ export const searchDocsTool: Tool = {
   }
 };
 
-/**
- * Retrieves the raw content of a specific ElevenLabs document from the docs_content.parquet file.
- * - docs_content.parquet schema: filePath, fileName, content, lineNumber, heading1, heading2, heading3, contentType, language, order
- * Returns: { raw: string }
- */
-export const getDocTool: Tool = {
-  name: "elevenlabs_get_doc",
-  description: "Get specific ElevenLabs document content by path (queried from docs_content.parquet in DuckDB).",
-  inputSchema: {
-    type: "object",
-    properties: {
-      path: {
-        type: "string",
-        description: "Document path relative to the fern directory (e.g., docs/pages/overview.mdx)",
-      },
-    },
-    required: ["path"],
-  },
-  outputSchema: {
-    type: "object",
-    properties: {
-      raw: { type: "string" }
-    },
-    required: ["raw"]
-  }
-};
 
 // Queries only the api_spec.parquet file for API spec search.
 export const searchApiFilesTool: Tool = {
@@ -105,7 +90,8 @@ export const searchApiFilesTool: Tool = {
             path: { type: "string" },
             snippet: { type: "string" },
             lineNumber: { type: "number" },
-            section: { type: "string" }
+            section: { type: "string" },
+            schemaDefinition: { type: "string" }
           },
           required: ["name", "path", "snippet"]
         }
@@ -116,4 +102,4 @@ export const searchApiFilesTool: Tool = {
 };
 
 // Export all tools
-export const allTools = [searchDocsTool, getDocTool, searchApiFilesTool];
+export const allTools = [searchDocsTool, searchApiFilesTool];

@@ -2,10 +2,10 @@ import { DuckDBService } from "../services/DuckDBService.js"; // Changed import
 // Import common result type and args type if defined, otherwise define locally or import later
 import { SearchDocsResultItem } from "../types/interfaces.js";
 
-// Define args locally if not in interfaces.ts, ensuring it matches tool definition
 interface SearchApiFilesArgs {
   query: string;
-  fullFile?: boolean;
+  limit?: number;
+  includeSchemaDefinition?: boolean;
 }
 
 function extractSnippets(
@@ -104,7 +104,7 @@ export async function handleSearchApiFiles(
       snippet = row.content;
     }
 
-    return {
+    const result: any = {
       name: row.fileName,
       path: row.filePath,
       repository: "elevenlabs/elevenlabs-docs",
@@ -113,6 +113,10 @@ export async function handleSearchApiFiles(
       section: section || undefined,
       lineNumber,
     };
+    if (args.includeSchemaDefinition && row.schemaDefinition) {
+      result.schemaDefinition = row.schemaDefinition;
+    }
+    return result;
   });
 
   return { results: formattedResults };

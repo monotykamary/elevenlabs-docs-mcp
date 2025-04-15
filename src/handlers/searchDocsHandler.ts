@@ -140,7 +140,7 @@ export async function handleSearchDocs(
     if (snippetObj.lineNumber) lineNumber = snippetObj.lineNumber;
     if (snippetObj.section) section = snippetObj.section;
 
-    return {
+    const result: any = {
       name: row.fileName,
       path: row.filePath,
       repository: "elevenlabs/elevenlabs-docs",
@@ -149,6 +149,11 @@ export async function handleSearchDocs(
       section: section || undefined,
       lineNumber,
     };
+    // Only include fullContent for markdown rows if requested
+    if (args.includeFullContent && row.sourceType === 'markdown' && row.fullContent) {
+      result.fullContent = row.fullContent;
+    }
+    return result;
   });
 
   return { results: formattedResults };
