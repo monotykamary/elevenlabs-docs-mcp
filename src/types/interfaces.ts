@@ -4,24 +4,19 @@ export interface SearchDocsArgs {
   limit?: number;
 }
 
+export interface SearchDocsResultItem {
+  name: string;
+  path: string;
+  repository: string;
+  url: string;
+  snippet: string;
+  section?: string;
+}
+
+export interface SearchDocsResult {
+  results: SearchDocsResultItem[];
+}
+
 export interface GetDocArgs {
   path: string;
 }
-
-export interface ListApiEndpointsArgs {
-  category?: string;
-  limit?: number;
-}
-
-export interface GetApiReferenceArgs {
-  endpoint: string;
-}
-
-export interface GetDocsStructureArgs {
-  includeApiDetails?: boolean;
-}
-
-export interface ListRepositoryPathArgs {
-  path: string;
-  depth?: number;
-} 

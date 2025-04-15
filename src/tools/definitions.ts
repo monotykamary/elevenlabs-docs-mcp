@@ -3,7 +3,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 // Tool definitions
 export const searchDocsTool: Tool = {
   name: "elevenlabs_search_docs",
-  description: "Search ElevenLabs documentation based on keywords",
+  description: "Search ElevenLabs documentation based on keywords. Returns file name, path, a snippet of matching content, repository, url, and (if available) section/heading for each result.",
   inputSchema: {
     type: "object",
     properties: {
@@ -36,81 +36,8 @@ export const getDocTool: Tool = {
   },
 };
 
-export const getDocsStructureTool: Tool = {
-  name: "elevenlabs_get_docs_structure",
-  description: "Retrieve and parse the docs.yml file to understand the documentation structure",
-  inputSchema: {
-    type: "object",
-    properties: {
-      includeApiDetails: {
-        type: "boolean",
-        description: "Whether to include detailed API information or just the structure",
-        default: false,
-      },
-    },
-  },
-};
-
-export const listRepositoryPathTool: Tool = {
-  name: "elevenlabs_list_repository_path",
-  description: "List files and directories at a specific path in the repository",
-  inputSchema: {
-    type: "object",
-    properties: {
-      path: {
-        type: "string",
-        description: "Path to list (relative to repository root)",
-      },
-      depth: {
-        type: "number",
-        description: "How many levels deep to traverse (default: 1)",
-        default: 1,
-      },
-    },
-    required: ["path"],
-  },
-};
-
-export const listApiEndpointsTool: Tool = {
-  name: "elevenlabs_list_api_endpoints",
-  description: "List available ElevenLabs API endpoints (base URL: https://api.elevenlabs.io)",
-  inputSchema: {
-    type: "object",
-    properties: {
-      category: {
-        type: "string",
-        description: "API category to filter endpoints (optional)",
-      },
-      limit: {
-        type: "number",
-        description: "Maximum number of endpoints to return (default 20)",
-        default: 20,
-      },
-    },
-  },
-};
-
-export const getApiReferenceTool: Tool = {
-  name: "elevenlabs_get_api_reference",
-  description: "Get API reference for a specific ElevenLabs API endpoint (base URL: https://api.elevenlabs.io)",
-  inputSchema: {
-    type: "object",
-    properties: {
-      endpoint: {
-        type: "string",
-        description: "API endpoint path (e.g., '/v1/text-to-speech') to be used with base URL https://api.elevenlabs.io",
-      },
-    },
-    required: ["endpoint"],
-  },
-};
-
-// Export all tools as an array for easier access
+// Export only the two tools
 export const allTools = [
   searchDocsTool,
   getDocTool,
-  getDocsStructureTool,
-  listRepositoryPathTool,
-  listApiEndpointsTool,
-  getApiReferenceTool,
-]; 
+];
