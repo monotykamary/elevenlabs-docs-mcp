@@ -17,22 +17,30 @@ export async function handleGetDoc(
     ? args.path
     : `fern/${args.path}`; // Keep the logic to prepend 'fern/' if needed
 
-  // Construct the absolute path within the container
-  // Assumes the submodule is copied to /app/elevenlabs-docs
-  const absolutePath = path.resolve('/app/elevenlabs-docs', fullPath);
+  // First, try to get the content from docs_content.parquet using DuckDB
+  const sql = `
+    SELECT content
+    FROM read_parquet(?)
+    WHERE filePath = ?
+    LIMIT 1;
+  `;
+  const docsContentPath = service.getDocsContentPath();
+  const dbResults = await service.executeQuery(sql, [docsContentPath, fullPath]);
 
-  console.log(`Attempting to read file: ${absolutePath}`);
+  if (dbResults && dbResults.length > 0 && dbResults[0].content) {
+    return { raw: dbResults[0].content };
+  }
+
+  // Fallback: Try to read the file from the file system if not found in DuckDB
+  const absolutePath = path.resolve('/app/elevenlabs-docs', fullPath);
 
   try {
     const content = await fs.readFile(absolutePath, 'utf-8');
-    // Return the raw content, wrapped in an object as before
     return { raw: content };
   } catch (error: any) {
-    console.error(`Error reading document ${absolutePath}:`, error);
     if (error.code === 'ENOENT') {
       throw new Error(`Document not found: ${fullPath}`);
     }
-    // Re-throw other errors
     throw new Error(`Could not retrieve document: ${fullPath}`);
   }
 }
