@@ -1,6 +1,6 @@
 # ElevenLabs Documentation MCP Server
 
-A Model Context Protocol (MCP) server for interacting with [ElevenLabs documentation](https://elevenlabs.io/docs/overview) at [https://github.com/monotykamary/elevenlabs-docs-mcp](https://github.com/monotykamary/elevenlabs-docs-mcp). This server provides tools to access and search ElevenLabs documentation and API spec files directly via the Model Context Protocol.
+A Model Context Protocol (MCP) server for interacting with [ElevenLabs documentation](https://elevenlabs.io/docs/overview) at [https://github.com/elevenlabs/elevenlabs-docs](https://github.com/elevenlabs/elevenlabs-docs). This server provides tools to access and search ElevenLabs documentation and API spec files directly via the Model Context Protocol.
 
 ![alt text](image.png)
 
