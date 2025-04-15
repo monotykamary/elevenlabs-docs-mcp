@@ -55,9 +55,39 @@ export async function handleSearchDocs(
   }
 
   const { query, limit = 10 } = args; // Use args from tool definition
-  const searchQuery = `%${query}%`; // Prepare for ILIKE
+  const fuzzyThreshold = 2; // Lower threshold for per-word fuzzy matching
 
-  // Construct the SQL query to search both Parquet files
+  // Split query into words for multi-word fuzzy search
+  const words = query
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter(Boolean);
+
+  // Build WHERE clause for each word, for each field
+  function buildWordClauses(fields: string[]) {
+    const clauses: string[] = [];
+    for (const word of words) {
+      for (const field of fields) {
+        clauses.push(`${field} ILIKE ?`);
+        clauses.push(`levenshtein(lower(${field}), lower(?)) <= ?`);
+      }
+    }
+    return clauses;
+  }
+
+  const apiFields = [
+    "content",
+    "summary",
+    "description",
+    "apiPath",
+    "method"
+  ];
+  const mdFields = ["content"];
+
+  const apiClauses = buildWordClauses(apiFields);
+  const mdClauses = buildWordClauses(mdFields);
+
+  // Compose the full SQL
   const sql = `
     WITH combined_results AS (
       SELECT
@@ -70,24 +100,21 @@ export async function handleSearchDocs(
         description,
         apiPath,
         method,
-        NULL as heading1, -- Placeholder columns for UNION ALL
+        NULL as heading1,
         NULL as heading2,
         NULL as heading3,
         NULL as contentType,
         NULL as language
-      FROM read_parquet(?) -- api_spec.parquet path
-      WHERE
-        content ILIKE ? OR summary ILIKE ? OR description ILIKE ? OR apiPath ILIKE ? OR method ILIKE ?
-
+      FROM read_parquet(?)
+      WHERE (${apiClauses.join(" OR ")})
       UNION ALL
-
       SELECT
         filePath,
         fileName,
         content,
         lineNumber,
         'markdown' as sourceType,
-        NULL as summary, -- Placeholder columns
+        NULL as summary,
         NULL as description,
         NULL as apiPath,
         NULL as method,
@@ -96,25 +123,33 @@ export async function handleSearchDocs(
         heading3,
         contentType,
         language
-      FROM read_parquet(?) -- docs_content.parquet path
-      WHERE content ILIKE ?
+      FROM read_parquet(?)
+      WHERE (${mdClauses.join(" OR ")})
     )
     SELECT * FROM combined_results
     ORDER BY filePath
     LIMIT ?;
   `;
 
-  const params = [
-    service.getApiSpecPath(), // Path to api_spec.parquet
-    searchQuery, // api: content
-    searchQuery, // api: summary
-    searchQuery, // api: description
-    searchQuery, // api: apiPath
-    searchQuery, // api: method
-    service.getDocsContentPath(), // Path to docs_content.parquet
-    searchQuery, // md: content
-    limit // LIMIT clause
-  ];
+  // Build params array
+  const params: any[] = [];
+  params.push(service.getApiSpecPath());
+  for (const word of words) {
+    for (let i = 0; i < apiFields.length; i++) {
+      params.push(`%${word}%`);
+      params.push(word);
+      params.push(fuzzyThreshold);
+    }
+  }
+  params.push(service.getDocsContentPath());
+  for (const word of words) {
+    for (let i = 0; i < mdFields.length; i++) {
+      params.push(`%${word}%`);
+      params.push(word);
+      params.push(fuzzyThreshold);
+    }
+  }
+  params.push(limit);
 
   const dbResults = await service.executeQuery(sql, params);
 
