@@ -58,12 +58,12 @@ export async function handleSearchDocs(
   const fuzzyThreshold = 2; // Lower threshold for per-word fuzzy matching
 
   // Optimization: If the query looks like an exact model/schema name, do a direct lookup
-  // e.g., "UpdatePhoneNumberRequest" or "GetPhoneNumberResponseModel"
-  const isExactSchemaQuery = /^[A-Z][A-Za-z0-9_]+(Request|Response|Model)?$/.test(query);
+  // Match any PascalCase or snake_case identifier (e.g., "GetConversationResponseModel", "MyCustomSchema")
+  const isExactSchemaQuery = /^[A-Z][A-Za-z0-9_]*$/.test(query);
 
   // Optimization: If the query looks like a doc file name, do a direct lookup in docs_content
   // e.g., "avoiding_vendor_lockin.md", "quickstart.mdx", "README.md"
-  const isDocFileQuery = /\.[mM][dD](x)?$|\.txt$/.test(query) || /^[\w\-]+$/.test(query);
+  const isDocFileQuery = /\.[mM][dD](x)?$|\.txt$/.test(query);
 
   if (isDocFileQuery) {
     // Direct lookup in docs_content.parquet by fileName or filePath (exact and partial)
