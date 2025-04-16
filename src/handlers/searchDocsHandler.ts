@@ -61,6 +61,79 @@ export async function handleSearchDocs(
   // e.g., "UpdatePhoneNumberRequest" or "GetPhoneNumberResponseModel"
   const isExactSchemaQuery = /^[A-Z][A-Za-z0-9_]+(Request|Response|Model)?$/.test(query);
 
+  // Optimization: If the query looks like a doc file name, do a direct lookup in docs_content
+  // e.g., "avoiding_vendor_lockin.md", "quickstart.mdx", "README.md"
+  const isDocFileQuery = /\.[mM][dD](x)?$|\.txt$/.test(query) || /^[\w\-]+$/.test(query);
+
+  if (isDocFileQuery) {
+    // Direct lookup in docs_content.parquet by fileName or filePath (exact and partial)
+    const sql = `
+      SELECT
+        filePath,
+        fileName,
+        content,
+        lineNumber,
+        'markdown' as sourceType,
+        NULL as summary,
+        NULL as description,
+        NULL as apiPath,
+        NULL as method,
+        heading1,
+        heading2,
+        heading3,
+        contentType,
+        language
+      FROM read_parquet(?)
+      WHERE
+        fileName = ?
+        OR filePath = ?
+        OR lower(fileName) LIKE lower(?)
+        OR lower(filePath) LIKE lower(?)
+      LIMIT ?;
+    `;
+    const likePattern = `%${query}%`;
+    const params = [
+      service.getDocsContentPath(),
+      query,
+      query,
+      likePattern,
+      likePattern,
+      limit
+    ];
+    const dbResults = await service.executeQuery(sql, params);
+
+    const formattedResults: SearchDocsResultItem[] = dbResults.map((row: any) => {
+      let section: string | undefined = [row.heading1, row.heading2, row.heading3].filter(Boolean).join(' > ');
+      const snippetObj = extractSnippet(row.content, query);
+      let snippet = snippetObj.snippet;
+      let lineNumber: number | undefined = row.lineNumber;
+      if (snippetObj.lineNumber) lineNumber = snippetObj.lineNumber;
+      if (snippetObj.section) section = snippetObj.section;
+
+      // Prepend the file name to the snippet for discoverability
+      if (row.fileName) {
+        snippet = `Doc: ${row.fileName}\n${snippet}`;
+      }
+
+      const result: any = {
+        name: row.fileName,
+        path: row.filePath,
+        repository: "elevenlabs/elevenlabs-docs",
+        url: `https://github.com/elevenlabs/elevenlabs-docs/blob/main/${row.filePath}`,
+        snippet,
+        section: section || undefined,
+        lineNumber,
+      };
+      // Always include fullContent for direct doc file queries
+      if (row.content) {
+        result.fullContent = row.content;
+      }
+      return result;
+    });
+
+    return { results: formattedResults };
+  }
+
   if (isExactSchemaQuery) {
     // Enhanced: Search summary, fileName, schemaDefinition, and content for exact or partial matches
     const sql = `
